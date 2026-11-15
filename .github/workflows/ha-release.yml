@@ -1,0 +1,28 @@
+name: Release Home Assistant integration
+
+# Creates a GitHub release v<version> whenever custom_components/coolledx_sign/manifest.json
+# gets a new version number, so HACS shows it as an update.
+on:
+  push:
+    branches: [main]
+    paths: ["custom_components/coolledx_sign/manifest.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create release for the manifest version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(jq -r .version custom_components/coolledx_sign/manifest.json)
+          if gh release view "v$VER" >/dev/null 2>&1; then
+            echo "v$VER already released"; exit 0
+          fi
+          gh release create "v$VER" --target "$GITHUB_SHA" --title "Home Assistant integration v$VER" \
+            --notes "CoolLEDX LED Sign integration v$VER. Update from HACS, then restart Home Assistant." --latest
