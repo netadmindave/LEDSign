@@ -1,0 +1,16 @@
+{
+  "domain": "coolledx_sign",
+  "name": "CoolLEDX LED Sign",
+  "bluetooth": [
+    {"local_name": "CoolLEDX*", "connectable": true}
+  ],
+  "codeowners": ["@netadmindave"],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/netadmindave/LEDSign",
+  "integration_type": "device",
+  "iot_class": "assumed_state",
+  "issue_tracker": "https://github.com/netadmindave/LEDSign/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

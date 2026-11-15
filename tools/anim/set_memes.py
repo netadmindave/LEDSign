@@ -531,23 +531,25 @@ def qswitch():
     return out
 
 
-@anim("Optics", "Fourier Pair", 400)
+@anim("Optics", "Fourier Pair", 260)
 def fourier():
+    """Gaussian pulse (left) and its spectrum (right): widths step inversely, sigma_t * sigma_f = const."""
+    steps = [0.8, 1.2, 1.8, 2.6, 3.8, 5.5, 3.8, 2.6, 1.8, 1.2]
+    K = 4.4                     # sigma_t * sigma_f in pixel units
     out = []
-    for t in range(8):
+    for st in steps:
+        sf = K / st
         f = blank()
-        short = (t // 4) % 2 == 0
-        for x in range(32):
-            wt = 1.2 if short else 6
-            ws = 8 if short else 2
-            ht = 12 * math.exp(-((x - 16) / wt) ** 2)
-            hs = 12 * math.exp(-((x - 16) / ws) ** 2)
+        for x in range(31):
+            ht = 12 * math.exp(-((x - 15) ** 2) / (2 * st * st))
+            hs = 12 * math.exp(-((x - 15) ** 2) / (2 * sf * sf))
             for y in range(15 - round(ht), 15):
                 put(f, x, y, Y)
             for y in range(15 - round(hs), 15):
-                put(f, x + 32, y, RAINBOW[min(5, x // 6)])
-        line(f, 31, 0, 31, 15, B)
-        text(f, "T", 1, 0, Wh); text(f, "F", 58, 0, Wh)
+                put(f, x + 33, y, RAINBOW[min(5, x // 6)])
+        line(f, 0, 15, 30, 15, Wh); line(f, 33, 15, 63, 15, Wh)
+        line(f, 31, 0, 31, 15, B); line(f, 32, 0, 32, 15, B)
+        text(f, "T", 0, 0, Wh); text(f, "F", 59, 0, Wh)
         out.append(f)
     return out
 

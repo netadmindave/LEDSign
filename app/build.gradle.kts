@@ -12,8 +12,8 @@ android {
         applicationId = "com.netadmindave.ledsign"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.3"
+        versionCode = 6
+        versionName = "1.4"
     }
 
     // One fixed key for every build so new APKs install over old ones (debug-grade key, standard password).

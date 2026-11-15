@@ -1,0 +1,157 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Add a CoolLEDX sign",
+        "description": "Close the CoolLED phone app first: the sign accepts one connection at a time.",
+        "data": {
+          "address": "Sign",
+          "password": "Sign password (6 digits)"
+        }
+      },
+      "confirm": {
+        "title": "Add {name}?",
+        "description": "Found {name} ({address}). Close the CoolLED phone app first.",
+        "data": {
+          "password": "Sign password (6 digits)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This sign is already set up.",
+      "no_devices_found": "No CoolLEDX sign found. Turn it on, close the phone app, and make sure a Bluetooth adapter or ESPHome proxy is in range.",
+      "not_supported": "This CoolLED model uses a different protocol."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sign options",
+        "data": {
+          "password": "Sign password (6 digits)",
+          "scroll_speed": "Default scroll speed (0-255)",
+          "large_text": "Large (double-height) text",
+          "idle_mode": "Idle animation choice",
+          "mirror": "Mirror everything (reading through glass)"
+        }
+      }
+    }
+  },
+  "services": {
+    "show_warning": {
+      "name": "Show warning",
+      "description": "Warning triangle, a WARNING label and a scrolling message.",
+      "fields": {
+        "device_id": {
+          "name": "Sign",
+          "description": "Leave empty for all signs."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Text to scroll."
+        },
+        "color": {
+          "name": "Message colour",
+          "description": "Colour of the message text."
+        },
+        "label": {
+          "name": "Label",
+          "description": "Red label shown after the icon."
+        },
+        "speed": {
+          "name": "Scroll speed",
+          "description": "0-255; default from options."
+        },
+        "large": {
+          "name": "Large text",
+          "description": "Double-height letters."
+        }
+      }
+    },
+    "show_text": {
+      "name": "Show status text",
+      "description": "Scrolling or still status message with optional icon.",
+      "fields": {
+        "device_id": {
+          "name": "Sign",
+          "description": "Leave empty for all signs."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Text to show."
+        },
+        "color": {
+          "name": "Colour",
+          "description": "Text colour."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Status icon in front of the text."
+        },
+        "label": {
+          "name": "Label",
+          "description": "Optional label before the message."
+        },
+        "mode": {
+          "name": "Motion",
+          "description": "How the sign moves the text."
+        },
+        "speed": {
+          "name": "Scroll speed",
+          "description": "0-255; default from options."
+        },
+        "large": {
+          "name": "Large text",
+          "description": "Double-height letters."
+        }
+      }
+    },
+    "show_animation": {
+      "name": "Show animation",
+      "description": "Play one of the 100 built-in animations.",
+      "fields": {
+        "device_id": {
+          "name": "Sign",
+          "description": "Leave empty for all signs."
+        },
+        "name": {
+          "name": "Animation name",
+          "description": "Exact or partial name, e.g. 'Frequency Comb'."
+        },
+        "frame_ms": {
+          "name": "Frame time",
+          "description": "Override the animation's frame time."
+        }
+      }
+    },
+    "show_idle": {
+      "name": "Show idle animation",
+      "description": "All-clear: a date-appropriate animation (holiday season, else reading or optics).",
+      "fields": {
+        "device_id": {
+          "name": "Sign",
+          "description": "Leave empty for all signs."
+        },
+        "mode": {
+          "name": "Choice",
+          "description": "auto, reading, optics, holidays, halloween, any, or an animation name."
+        }
+      }
+    },
+    "set_reverse": {
+      "name": "Reverse display",
+      "description": "Rotate the sign 180 degrees (the sign's own setting).",
+      "fields": {
+        "device_id": {
+          "name": "Sign",
+          "description": "Leave empty for all signs."
+        },
+        "enabled": {
+          "name": "Reversed",
+          "description": "On = upside-down."
+        }
+      }
+    }
+  }
+}

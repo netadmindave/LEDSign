@@ -1,0 +1,100 @@
+show_warning:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: coolledx_sign
+    message:
+      required: true
+      example: "Garage door open"
+      selector:
+        text:
+    color:
+      default: yellow
+      selector:
+        select:
+          options: [white, red, green, yellow, blue, magenta, cyan, rainbow]
+    label:
+      default: WARNING
+      selector:
+        text:
+    speed:
+      selector:
+        number: {min: 0, max: 255}
+    large:
+      selector:
+        boolean:
+
+show_text:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: coolledx_sign
+    message:
+      required: true
+      example: "All systems normal"
+      selector:
+        text:
+    color:
+      default: white
+      selector:
+        select:
+          options: [white, red, green, yellow, blue, magenta, cyan, rainbow]
+    icon:
+      default: none
+      selector:
+        select:
+          options: [none, warning, error, info, ok]
+    label:
+      selector:
+        text:
+    mode:
+      default: scroll_left
+      selector:
+        select:
+          options: [static, scroll_left, scroll_right, scroll_up, scroll_down, snowflake, laser]
+    speed:
+      selector:
+        number: {min: 0, max: 255}
+    large:
+      selector:
+        boolean:
+
+show_animation:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: coolledx_sign
+    name:
+      required: true
+      example: "Prism Dispersion"
+      selector:
+        text:
+    frame_ms:
+      selector:
+        number: {min: 20, max: 2000, unit_of_measurement: ms}
+
+show_idle:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: coolledx_sign
+    mode:
+      example: auto
+      selector:
+        select:
+          options: [auto, reading, optics, holidays, halloween, any]
+
+set_reverse:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: coolledx_sign
+    enabled:
+      required: true
+      selector:
+        boolean:

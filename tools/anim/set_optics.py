@@ -154,19 +154,26 @@ def comb():
 
 @anim("Optics", "Heterodyne Beat Note", 70)
 def beat():
+    """cos(k1 u) + cos(k2 u) = 2 cos((k1-k2)u/2) cos((k1+k2)u/2): carrier inside its beat envelope."""
+    k1, k2 = 2 * math.pi / 5.0, 2 * math.pi / 6.0      # beat period = 30 px
+    A = 3.5                                             # 2A = 7 px half-height, centre row 7.5
+    frames = 30                                         # one full beat period -> seamless loop
     out = []
-    f1, f2 = 2 * math.pi / 6.0, 2 * math.pi / 6.8
-    for t in range(32):
+    for t in range(frames):
         f = blank()
         prev = None
         for x in range(W):
-            s = math.cos(f1 * (x + t * 2)) + math.cos(f2 * (x + t * 2) + 0.4)
-            y = round(7.5 - s * 3.6)
-            env = abs(2 * math.cos((f1 - f2) / 2 * (x + t * 2) + 0.2))
-            put(f, x, round(7.5 - env * 3.6), M)
-            put(f, x, round(7.5 + env * 3.6), M)
+            u = x + t
+            env = 2 * abs(math.cos((k1 - k2) * u / 2))
+            put(f, x, round(7.5 - A * env), M)
+            put(f, x, round(7.5 + A * env), M)
+        for x in range(W):
+            u = x + t
+            y = round(7.5 - A * (math.cos(k1 * u) + math.cos(k2 * u)))
             if prev is not None:
                 line(f, x - 1, prev, x, y, Y)
+            else:
+                put(f, x, y, Y)
             prev = y
         out.append(f)
     return out
