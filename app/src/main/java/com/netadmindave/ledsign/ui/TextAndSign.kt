@@ -19,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -160,6 +162,15 @@ fun SignScreen(vm: AppVM) {
                 modifier = Modifier.clip(MaterialTheme.shapes.medium)
             )
         }
+        HorizontalDivider()
+        var pwd by rememberSaveable { mutableStateOf(vm.ble.password) }
+        Text("Sign password", fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(pwd, { v -> pwd = v.filter { it.isDigit() }.take(6) }, singleLine = true,
+            label = { Text("6 digits (default 000000)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            modifier = Modifier.fillMaxWidth())
+        TextButton({ vm.ble.password = pwd; vm.ble.disconnect(); scope.launch { vm.ble.reconnectLast() } },
+            enabled = pwd.length == 6) { Text("Save & reconnect") }
         HorizontalDivider()
         Text("Orientation", fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically) {

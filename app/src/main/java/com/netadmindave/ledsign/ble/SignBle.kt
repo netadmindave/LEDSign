@@ -62,6 +62,7 @@ class SignBle(private val ctx: Context) {
         val CHAR: UUID = UUID.fromString("0000fff1-0000-1000-8000-00805f9b34fb")
         val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private val NAME_PREFIXES = listOf("CoolLED", "iLed", "iDevilEyes")
+        private val PASSWORD_PREFIXES = listOf("CoolLEDS", "CoolLEDX", "CoolLEDM")
         private const val NEEDED_PAYLOAD = 180   // largest framed 128-byte chunk is ~150 bytes, escapes included
 
         fun ackStatusText(s: Int) = when (s) {
@@ -237,7 +238,13 @@ class SignBle(private val ctx: Context) {
         mtuPayload = 20
         gatt = dev.connectGatt(ctx, false, gattCb, BluetoothDevice.TRANSPORT_LE)
         val ok = withTimeoutOrNull(12_000) { readyAck!!.await() } ?: false
-        if (ok) delay(650)   // the sign needs a moment after connecting before it accepts data
+        if (ok) {
+            delay(650)   // the sign needs a moment after connecting before it accepts data
+            if (PASSWORD_PREFIXES.any { sign.name.startsWith(it) } && !checkPassword()) {
+                disconnect(); _state.value = LinkState.ERROR
+                return false
+            }
+        }
         return if (ok && gatt != null) {
             _connected.value = sign
             _state.value = LinkState.READY
@@ -270,6 +277,33 @@ class SignBle(private val ctx: Context) {
         gatt = null; ch = null
         _connected.value = null
         if (_state.value != LinkState.SCANNING) _state.value = LinkState.IDLE
+    }
+
+    // ------------------------------------------------------------------ password
+    private val prefs = ctx.getSharedPreferences("sign", Context.MODE_PRIVATE)
+    var password: String
+        get() = prefs.getString("password", "000000")!!
+        set(v) { prefs.edit().putString("password", v.filter { it.isDigit() }.take(6).padEnd(6, '0')).apply() }
+
+    /**
+     * CoolLEDS/X/M signs ignore uploads until the 6-digit password is verified (default 000000):
+     * send 0x0D + ASCII digits, the reply's last byte is 0 when accepted.
+     */
+    private suspend fun checkPassword(): Boolean {
+        while (notifications.tryReceive().isSuccess) { }
+        val pwd = password
+        val frame = CoolLedX.frame(byteArrayOf(0x0D) + pwd.toByteArray(Charsets.US_ASCII))
+        log("password check (${"*".repeat(pwd.length)}) TX ${hex(frame)}")
+        if (!writeOnce(frame)) { log("password write failed"); return true }
+        val reply = withTimeoutOrNull(5_000) { notifications.receive() }
+        if (reply == null) { log("no reply to password check — continuing"); return true }
+        val p = CoolLedX.unframe(reply)
+        val status = p?.lastOrNull()?.toInt()?.and(0xFF)
+        return if (status == 0) { log("password accepted"); true } else {
+            log("password REJECTED (status $status)")
+            _message.value = "The sign rejected the password. Enter the sign's password on the Sign tab (default 000000)."
+            false
+        }
     }
 
     // ------------------------------------------------------------------ writing
@@ -324,7 +358,7 @@ class SignBle(private val ctx: Context) {
         return Triple(cmd, idx, status)
     }
 
-    private suspend fun awaitAck(cmd: Int, idx: Int): Int? = withTimeoutOrNull(2_500) {
+    private suspend fun awaitAck(cmd: Int, idx: Int): Int? = withTimeoutOrNull(5_000) {
         var result: Int? = null
         while (result == null) {
             val a = parseAck(notifications.receive())
@@ -367,6 +401,10 @@ class SignBle(private val ctx: Context) {
             var error: String? = null
             try {
                 for (p in before) { log("TX ${hex(p)}"); writeOnce(p); delay(90) }
+                val begin = CoolLedX.frame(byteArrayOf(0x0A))   // "begin transfer"
+                log("TX ${hex(begin)} (begin transfer)")
+                writeOnce(begin)
+                delay(60)
                 while (notifications.tryReceive().isSuccess) { /* drop stale notifications */ }
                 for ((i, p) in packets.withIndex()) {
                     var status: Int? = null
