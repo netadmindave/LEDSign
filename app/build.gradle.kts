@@ -12,17 +12,27 @@ android {
         applicationId = "com.netadmindave.ledsign"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.2.1"
+    }
+
+    // One fixed key for every build so new APKs install over old ones (debug-grade key, standard password).
+    signingConfigs {
+        create("stable") {
+            storeFile = file("ledsign-debug.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("stable") }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so the APK installs directly when sideloaded.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("stable")
         }
     }
     compileOptions {
