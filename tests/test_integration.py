@@ -15,6 +15,8 @@ class FakeSign:
     """Reassembles 20-byte writes into frames and answers like the real sign."""
 
     def __init__(self):
+        self.nack_once = {}          # packet index -> status to return the first time
+        self.drop_writes_after = None  # simulate a dropped link after N frames (first connection only)
         self.buf = bytearray()
         self.frames: list[bytes] = []
         self.piece_sizes: list[int] = []
@@ -32,11 +34,18 @@ class FakeSign:
             end = self.buf.index(0x03)
             fr = bytes(self.buf[:end + 1]); del self.buf[:end + 1]
             self.frames.append(fr)
+            if self.drop_writes_after is not None and len(self.frames) >= self.drop_writes_after:
+                self.drop_writes_after = None
+                self.buf.clear()
+                from bleak.exc import BleakError
+                raise BleakError("[org.bluez.Error.Failed] Not connected")
             p = P.unframe(fr)
             if p[0] == P.CMD_PASSWORD:
                 self.cb(None, bytearray(P.frame(bytes([0x0D, 0x00]))))
             elif p[0] in (P.CMD_TEXT, P.CMD_IMAGE, P.CMD_ANIMATION):
-                self.cb(None, bytearray(P.frame(bytes([p[0], 0, p[4], p[5], 0]))))
+                idx = (p[4] << 8) | p[5]
+                status = self.nack_once.pop(idx, 0)
+                self.cb(None, bytearray(P.frame(bytes([p[0], 0, p[4], p[5], status]))))
 
     async def disconnect(self):
         self.connected = False
@@ -115,3 +124,16 @@ async def test_user_flow_no_devices(hass):
     with patch("custom_components.coolledx_sign.config_flow.async_discovered_service_info", return_value=[]):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     assert result["type"] == "abort" and result["reason"] == "no_devices_found"
+
+
+async def test_resends_corrupted_packet(hass, entry, sign):
+    sign.nack_once = {1: 3}   # "data error" on packet 2, like the HA log
+    await hass.services.async_call(DOMAIN, "show_animation", {"name": "Prism Dispersion"}, blocking=True)
+    idx = [((P.unframe(f)[4] << 8) | P.unframe(f)[5]) for f in sign.frames if P.unframe(f)[0] == P.CMD_ANIMATION]
+    assert idx.count(1) == 2 and idx[-1] == max(idx)
+
+
+async def test_reconnects_after_drop(hass, entry, sign):
+    sign.drop_writes_after = 5    # link drops mid-transfer on the first connection
+    await hass.services.async_call(DOMAIN, "show_animation", {"name": "Fourier Pair"}, blocking=True)
+    assert sign.cmds().count(P.CMD_PASSWORD) == 2     # reconnected and started over

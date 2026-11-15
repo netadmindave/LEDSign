@@ -26,8 +26,9 @@ CHUNK = 128
 MAX_PAYLOAD = 30 * 1024          # the 16x64 sign rejects uploads much past ~30 KiB
 MAX_ANIMATION_FRAMES = 79
 WRITE_PIECE = 20
-WRITE_GAP_S = 0.015
+WRITE_GAP_S = 0.025          # stock app uses 15 ms; a little slack for BlueZ / proxies
 
+RETRYABLE_ACK = {1, 3, 6}     # transmission failed / data error / checksum -> resend the packet
 ACK_TEXT = {0: "OK", 1: "transmission failed", 2: "device abnormality", 3: "data error",
             4: "data too long", 5: "data ID error", 6: "checksum error"}
 
