@@ -19,6 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.netadmindave.ledsign.ble.LinkState
 import com.netadmindave.ledsign.data.LedColors
@@ -105,6 +108,11 @@ fun SignScreen(vm: AppVM) {
     val conn by vm.ble.connected.collectAsState()
     var bright by rememberSaveable { mutableFloatStateOf(160f) }
     val scope = rememberCoroutineScope()
+    val flip by vm.flip.collectAsState()
+    val mirror by vm.mirror.collectAsState()
+    val logLines by vm.ble.log.collectAsState()
+    var showLog by rememberSaveable { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -119,6 +127,9 @@ fun SignScreen(vm: AppVM) {
                         OutlinedButton({ vm.power(true) }) { Icon(Icons.Filled.LightMode, null); Spacer(Modifier.width(4.dp)); Text("Display on") }
                         OutlinedButton({ vm.power(false) }) { Icon(Icons.Filled.DarkMode, null); Spacer(Modifier.width(4.dp)); Text("Display off") }
                     }
+                    Button({ vm.sendTestPattern() }) { Icon(Icons.Filled.GridView, null); Spacer(Modifier.width(6.dp)); Text("Send test pattern") }
+                    Text("Shows red/blue halves swapping, with a white corner mark at the top-left.",
+                        style = MaterialTheme.typography.bodySmall)
                     TextButton({ vm.ble.disconnect() }) { Text("Disconnect") }
                 } else {
                     Text("No sign connected", style = MaterialTheme.typography.titleMedium)
@@ -148,6 +159,32 @@ fun SignScreen(vm: AppVM) {
                 },
                 modifier = Modifier.clip(MaterialTheme.shapes.medium)
             )
+        }
+        HorizontalDivider()
+        Text("Orientation", fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(flip, { vm.setFlip(it) }); Spacer(Modifier.width(10.dp))
+            Column { Text("Upside-down (rotate 180°)"); Text("For a sign mounted inverted", style = MaterialTheme.typography.bodySmall) }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(mirror, { vm.setMirror(it) }); Spacer(Modifier.width(10.dp))
+            Column { Text("Mirror (reverse left-right)"); Text("For reading through a window from behind", style = MaterialTheme.typography.bodySmall) }
+        }
+        Text("Applies to everything you send from now on; scroll directions are adjusted to match.",
+            style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Diagnostics log (${logLines.size})", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            TextButton({ showLog = !showLog }) { Text(if (showLog) "Hide" else "Show") }
+            TextButton({ clipboard.setText(AnnotatedString(logLines.joinToString("\n"))) }) { Text("Copy") }
+        }
+        if (showLog) {
+            Surface(color = Color(0xFF0B0B0F), shape = MaterialTheme.shapes.small) {
+                Text(logLines.takeLast(80).joinToString("\n").ifEmpty { "Nothing logged yet." },
+                    fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.fillMaxWidth().padding(8.dp))
+            }
+            TextButton({ vm.ble.clearLog() }) { Text("Clear log") }
         }
         HorizontalDivider()
         Text("Privacy", fontWeight = FontWeight.SemiBold)

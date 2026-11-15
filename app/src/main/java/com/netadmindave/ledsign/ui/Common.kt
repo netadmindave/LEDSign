@@ -123,6 +123,34 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         _creations.value = Library.creations(getApplication())
     }
 
+    // ---------------------------------------------------------------- orientation
+    private val prefs = app.getSharedPreferences("sign", android.content.Context.MODE_PRIVATE)
+    private val _flip = MutableStateFlow(prefs.getBoolean("flip", false))
+    val flip: StateFlow<Boolean> = _flip.asStateFlow()
+    private val _mirror = MutableStateFlow(prefs.getBoolean("mirror", false))
+    val mirror: StateFlow<Boolean> = _mirror.asStateFlow()
+    fun setFlip(v: Boolean) { _flip.value = v; prefs.edit().putBoolean("flip", v).apply() }
+    fun setMirror(v: Boolean) { _mirror.value = v; prefs.edit().putBoolean("mirror", v).apply() }
+
+    private fun orient(g: PixelGrid): PixelGrid {
+        var o = g
+        if (_mirror.value) o = o.mirrored()
+        if (_flip.value) o = o.rotated180()
+        return o
+    }
+
+    /** Scrolling direction as seen by the viewer must survive the flip/mirror. */
+    private fun orientMode(m: CoolLedX.Mode): CoolLedX.Mode {
+        var mode = m
+        if (_mirror.value xor _flip.value) mode = when (mode) {
+            CoolLedX.Mode.LEFT -> CoolLedX.Mode.RIGHT; CoolLedX.Mode.RIGHT -> CoolLedX.Mode.LEFT; else -> mode
+        }
+        if (_flip.value) mode = when (mode) {
+            CoolLedX.Mode.UP -> CoolLedX.Mode.DOWN; CoolLedX.Mode.DOWN -> CoolLedX.Mode.UP; else -> mode
+        }
+        return mode
+    }
+
     fun panel(): Pair<Int, Int> {
         val s = ble.connected.value
         return (s?.cols ?: 64) to (s?.rows ?: 16)
@@ -130,23 +158,38 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     fun sendAnimation(frames: List<PixelGrid>, speedMs: Int, label: String) = viewModelScope.launch {
         val (w, h) = panel()
-        val fitted = frames.map { it.fitTo(w, h) }
-        val packets = withContext(Dispatchers.Default) {
-            if (fitted.size == 1) CoolLedX.sendImage(fitted[0])
-            else CoolLedX.sendAnimation(fitted.take(CoolLedX.maxFramesFor(w, h)), speedMs)
+        val fitted = withContext(Dispatchers.Default) { frames.map { orient(it.fitTo(w, h)) } }
+        if (fitted.size == 1) {
+            val packets = withContext(Dispatchers.Default) { CoolLedX.sendImage(fitted[0]) }
+            ble.upload(CoolLedX.CMD_TEXT, packets, label,
+                before = listOf(CoolLedX.mode(CoolLedX.Mode.STATIC)), after = listOf(CoolLedX.mode(CoolLedX.Mode.STATIC)))
+        } else {
+            val packets = withContext(Dispatchers.Default) {
+                CoolLedX.sendAnimation(fitted.take(minOf(79, CoolLedX.maxFramesFor(w, h))), speedMs.coerceIn(20, 2000))
+            }
+            ble.upload(CoolLedX.CMD_ANIMATION, packets, label)
         }
-        ble.send(packets, label = label)
     }
 
     fun sendText(text: String, grid: PixelGrid, mode: CoolLedX.Mode, speed: Int) = viewModelScope.launch {
-        val packets = withContext(Dispatchers.Default) { CoolLedX.sendText(text, grid) }
-        if (ble.send(packets, label = "\"$text\"")) {
-            ble.send(listOf(CoolLedX.mode(mode), CoolLedX.speed(speed)), waitForAck = false)
-        }
+        val m = orientMode(mode)
+        val packets = withContext(Dispatchers.Default) { CoolLedX.sendText(text, orient(grid)) }
+        val modeCmds = listOf(CoolLedX.mode(m), CoolLedX.speed(speed))
+        ble.upload(CoolLedX.CMD_TEXT, packets, "\"$text\"", before = modeCmds, after = listOf(CoolLedX.mode(m)))
     }
 
-    fun brightness(v: Int) = viewModelScope.launch { ble.send(listOf(CoolLedX.brightness(v)), waitForAck = false) }
-    fun power(on: Boolean) = viewModelScope.launch { ble.send(listOf(CoolLedX.power(on)), waitForAck = false) }
+    /** Two-frame test: red left half / blue right half, then swapped, with a white top-left corner marker. */
+    fun sendTestPattern() {
+        val (w, h) = panel()
+        fun frame(a: Int, b: Int) = PixelGrid(w, h).also { g ->
+            for (y in 0 until h) for (x in 0 until w) g[x, y] = if (x < w / 2) a else b
+            for (k in 0 until 4) { g[k, 0] = 7; g[0, k] = 7 }
+        }
+        sendAnimation(listOf(frame(1, 4), frame(4, 1)), 500, "Test pattern")
+    }
+
+    fun brightness(v: Int) = viewModelScope.launch { ble.sendCommands(listOf(CoolLedX.brightness(v))) }
+    fun power(on: Boolean) = viewModelScope.launch { ble.sendCommands(listOf(CoolLedX.power(on))) }
 
     override fun onCleared() { ble.disconnect() }
 }

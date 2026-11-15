@@ -13,6 +13,20 @@ class PixelGrid(val width: Int, val height: Int, val px: IntArray = IntArray(wid
     }
     fun copy() = PixelGrid(width, height, px.copyOf())
 
+    /** Turn upside-down (for a sign mounted inverted). */
+    fun rotated180(): PixelGrid {
+        val o = PixelGrid(width, height)
+        for (y in 0 until height) for (x in 0 until width) o[width - 1 - x, height - 1 - y] = this[x, y]
+        return o
+    }
+
+    /** Left-right mirror (for reading through glass from behind). */
+    fun mirrored(): PixelGrid {
+        val o = PixelGrid(width, height)
+        for (y in 0 until height) for (x in 0 until width) o[width - 1 - x, y] = this[x, y]
+        return o
+    }
+
     /** Centre this grid on a canvas of the given size (crops or pads). */
     fun fitTo(w: Int, h: Int): PixelGrid {
         if (w == width && h == height) return this
@@ -185,7 +199,11 @@ object CoolLedX {
         return out.toByteArray()
     }
 
-    fun sendImage(g: PixelGrid) = chunked(CMD_IMAGE, imagePayload(g))
+    /**
+     * Still images go out as a TEXT upload (0x02) with the standard 107-byte header, which is what the
+     * hardware-tested RavestickBoard firmware does on the 16x64 CoolLEDX. Follow with mode STATIC.
+     */
+    fun sendImage(g: PixelGrid) = chunked(CMD_TEXT, textPayload(" ", g))
     fun sendText(text: String, g: PixelGrid) = chunked(CMD_TEXT, textPayload(text, g))
     fun sendAnimation(frames: List<PixelGrid>, speed: Int) = chunked(CMD_ANIMATION, animationPayload(frames, speed))
 
