@@ -22,8 +22,19 @@ class FakeSign:
         self.piece_sizes: list[int] = []
         self.cb = None
         self.connected = True
+        self.connects = 0
+        self.cache_cleared = 0
+
+    @property
+    def is_connected(self):
+        return self.connected
+
+    async def clear_cache(self):
+        self.cache_cleared += 1
 
     async def start_notify(self, uuid, cb):
+        self.connected = True
+        self.connects += 1
         self.cb = cb
 
     async def write_gatt_char(self, uuid, data, response=False):
@@ -37,6 +48,7 @@ class FakeSign:
             if self.drop_writes_after is not None and len(self.frames) >= self.drop_writes_after:
                 self.drop_writes_after = None
                 self.buf.clear()
+                self.connected = False
                 from bleak.exc import BleakError
                 raise BleakError("[org.bluez.Error.Failed] Not connected")
             p = P.unframe(fr)
@@ -71,6 +83,8 @@ async def entry(hass: HomeAssistant, sign):
         assert await hass.config_entries.async_setup(e.entry_id)
         await hass.async_block_till_done()
         yield e
+        await hass.config_entries.async_unload(e.entry_id)
+        await hass.async_block_till_done()
 
 
 async def test_warning(hass, entry, sign):
@@ -78,7 +92,7 @@ async def test_warning(hass, entry, sign):
     assert sign.cmds()[0] == P.CMD_PASSWORD
     assert P.CMD_MODE in sign.cmds() and P.CMD_TEXT in sign.cmds()
     assert max(sign.piece_sizes) <= 20
-    assert not sign.connected
+    assert sign.connected            # stays connected (idle timer will drop it)
 
 
 async def test_status_animation_idle(hass, entry, sign):
@@ -137,3 +151,27 @@ async def test_reconnects_after_drop(hass, entry, sign):
     sign.drop_writes_after = 5    # link drops mid-transfer on the first connection
     await hass.services.async_call(DOMAIN, "show_animation", {"name": "Fourier Pair"}, blocking=True)
     assert sign.cmds().count(P.CMD_PASSWORD) == 2     # reconnected and started over
+    assert sign.cache_cleared >= 1
+
+
+async def test_one_connection_for_many_actions(hass, entry, sign):
+    states = [s.entity_id for s in hass.states.async_all()]
+    light = next(s for s in states if s.startswith("light."))
+    await hass.services.async_call("light", "turn_on", {"entity_id": light, "brightness": 90}, blocking=True)
+    await hass.services.async_call(DOMAIN, "show_text", {"message": "hi"}, blocking=True)
+    await hass.services.async_call(DOMAIN, "show_idle", {}, blocking=True)
+    assert sign.connects == 1 and sign.cmds().count(P.CMD_PASSWORD) == 1
+
+
+async def test_idle_disconnect(hass, entry, sign):
+    from custom_components.coolledx_sign.const import DOMAIN as D
+    ctl = next(iter(hass.data[D].values()))
+    ctl.client.idle_disconnect = 0.01
+    await hass.services.async_call(DOMAIN, "show_text", {"message": "hi"}, blocking=True)
+    import asyncio
+    loop = asyncio.get_running_loop()
+    for _ in range(50):          # real waits (asyncio.sleep is patched in this fixture)
+        if not sign.connected:
+            break
+        fut = loop.create_future(); loop.call_later(0.01, fut.set_result, None); await fut
+    assert not sign.connected

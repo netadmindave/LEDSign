@@ -44,17 +44,21 @@ class SignController:
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
     async def _run(self, **kw) -> None:
-        dev = bluetooth.async_ble_device_from_address(self.hass, self.address, connectable=True)
-        if dev is None:
+        def get_device():
+            return bluetooth.async_ble_device_from_address(self.hass, self.address, connectable=True)
+
+        if get_device() is None:
             raise HomeAssistantError(
                 f"{self.name} ({self.address}) is not in Bluetooth range. Check the sign is on, the phone app "
                 "is disconnected, and a Bluetooth adapter or ESPHome proxy can hear it.")
         try:
-            await self.client.run(dev, **kw)
+            await self.client.run(get_device, **kw)
         except SignError as err:
-            raise HomeAssistantError(str(err)) from err
-        except Exception as err:  # bleak / proxy errors
-            raise HomeAssistantError(f"Bluetooth error talking to {self.name}: {err}") from err
+            raise HomeAssistantError(f"{self.name}: {err}") from err
+        except Exception as err:  # bleak / proxy errors after all retries
+            raise HomeAssistantError(
+                f"Bluetooth error talking to {self.name} after 3 attempts: {err}. If this keeps happening, "
+                "close the phone app and power-cycle the sign.") from err
 
     def _mirror(self, grid):
         return [row[::-1] for row in grid] if self._opt(CONF_MIRROR, False) else grid
@@ -97,7 +101,11 @@ class SignController:
         return anim["name"]
 
     async def command(self, cmd: int, value: int) -> None:
-        await self._run(commands_before=[P.simple(cmd, value)])
+        await self.commands([(cmd, value)])
+
+    async def commands(self, pairs: list[tuple[int, int]]) -> None:
+        """Several short commands over one connection."""
+        await self._run(commands_before=[P.simple(c, v) for c, v in pairs])
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -121,7 +129,9 @@ async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        ctl = hass.data[DOMAIN].pop(entry.entry_id, None)
+        if ctl:
+            await ctl.client.close()
     return ok
 
 

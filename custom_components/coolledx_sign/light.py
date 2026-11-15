@@ -31,11 +31,13 @@ class SignLight(SignEntity, LightEntity, RestoreEntity):
             self._attr_brightness = last.attributes.get(ATTR_BRIGHTNESS, 160)
 
     async def async_turn_on(self, **kwargs) -> None:
+        cmds = []
         if ATTR_BRIGHTNESS in kwargs:
             self._attr_brightness = max(1, int(kwargs[ATTR_BRIGHTNESS]))
-            await self.ctl.command(P.CMD_BRIGHTNESS, self._attr_brightness)
+            cmds.append((P.CMD_BRIGHTNESS, self._attr_brightness))
         if not self._attr_is_on or ATTR_BRIGHTNESS not in kwargs:
-            await self.ctl.command(P.CMD_SWITCH, 1)
+            cmds.append((P.CMD_SWITCH, 1))
+        await self.ctl.commands(cmds)   # one connection for both
         self._attr_is_on = True
         self.async_write_ha_state()
 
