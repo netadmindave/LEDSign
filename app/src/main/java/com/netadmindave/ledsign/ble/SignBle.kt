@@ -89,6 +89,9 @@ class SignBle(private val ctx: Context) {
     val log: StateFlow<List<String>> = _log.asStateFlow()
 
     private var gatt: BluetoothGatt? = null
+    /** CoolLEDX (1248 family) keeps the default MTU and takes 20-byte writes, 15 ms apart — exactly like the stock app. */
+    @Volatile private var smallWrites = true
+    private val writeSize: Int get() = if (smallWrites) 20 else mtuPayload
     private var ch: BluetoothGattCharacteristic? = null
     @Volatile private var mtuPayload = 20
     private val writeMutex = Mutex()
@@ -158,9 +161,14 @@ class SignBle(private val ctx: Context) {
     private val gattCb = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                log("connected (status $status), requesting MTU 247")
                 g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                if (!g.requestMtu(247)) { log("requestMtu refused"); g.discoverServices() }
+                if (smallWrites) {
+                    log("connected (status $status); CoolLEDX: default MTU, 20-byte writes")
+                    g.discoverServices()
+                } else {
+                    log("connected (status $status), requesting MTU 247")
+                    if (!g.requestMtu(247)) { log("requestMtu refused"); g.discoverServices() }
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 log("disconnected (status $status)")
                 g.close()
@@ -236,6 +244,7 @@ class SignBle(private val ctx: Context) {
         log("connecting to ${sign.name} ${sign.address} (${sign.sizeLabel})")
         readyAck = CompletableDeferred()
         mtuPayload = 20
+        smallWrites = sign.family == "X"
         gatt = dev.connectGatt(ctx, false, gattCb, BluetoothDevice.TRANSPORT_LE)
         val ok = withTimeoutOrNull(12_000) { readyAck!!.await() } ?: false
         if (ok) {
@@ -251,7 +260,7 @@ class SignBle(private val ctx: Context) {
             ctx.getSharedPreferences("sign", Context.MODE_PRIVATE).edit()
                 .putString("last_addr", sign.address).putString("last_name", sign.name)
                 .putInt("rows", sign.rows ?: 16).putInt("cols", sign.cols ?: 64).apply()
-            log("ready, write payload limit $mtuPayload bytes")
+            log("ready, write size $writeSize bytes")
             true
         } else {
             _message.value = "Couldn't connect to ${sign.name}. Close the CoolLED app (only one phone can connect at a time)."
@@ -325,7 +334,7 @@ class SignBle(private val ctx: Context) {
         var off = 0
         var busyRetries = 0
         while (off < bytes.size) {
-            val piece = bytes.copyOfRange(off, minOf(bytes.size, off + mtuPayload))
+            val piece = bytes.copyOfRange(off, minOf(bytes.size, off + writeSize))
             writeAck = CompletableDeferred()
             val started = if (Build.VERSION.SDK_INT >= 33) {
                 g.writeCharacteristic(c, piece, type) == BluetoothStatusCodes.SUCCESS
@@ -344,6 +353,7 @@ class SignBle(private val ctx: Context) {
             busyRetries = 0
             withTimeoutOrNull(2_000) { writeAck!!.await() } ?: return false
             off += piece.size
+            if (off < bytes.size) delay(15)
         }
         return true
     }
@@ -391,7 +401,7 @@ class SignBle(private val ctx: Context) {
                        before: List<ByteArray> = emptyList(), after: List<ByteArray> = emptyList()): Boolean =
         writeMutex.withLock {
             if (!ensureLink()) { _message.value = "Not connected to a sign"; return@withLock false }
-            if (!ensureMtu()) {
+            if (!smallWrites && !ensureMtu()) {
                 _message.value = "Bluetooth packet size too small ($mtuPayload B). Disconnect and reconnect, then try again."
                 return@withLock false
             }
@@ -401,10 +411,6 @@ class SignBle(private val ctx: Context) {
             var error: String? = null
             try {
                 for (p in before) { log("TX ${hex(p)}"); writeOnce(p); delay(90) }
-                val begin = CoolLedX.frame(byteArrayOf(0x0A))   // "begin transfer"
-                log("TX ${hex(begin)} (begin transfer)")
-                writeOnce(begin)
-                delay(60)
                 while (notifications.tryReceive().isSuccess) { /* drop stale notifications */ }
                 for ((i, p) in packets.withIndex()) {
                     var status: Int? = null

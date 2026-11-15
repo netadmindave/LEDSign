@@ -129,26 +129,24 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     val flip: StateFlow<Boolean> = _flip.asStateFlow()
     private val _mirror = MutableStateFlow(prefs.getBoolean("mirror", false))
     val mirror: StateFlow<Boolean> = _mirror.asStateFlow()
-    fun setFlip(v: Boolean) { _flip.value = v; prefs.edit().putBoolean("flip", v).apply() }
+    fun setFlip(v: Boolean) {
+        _flip.value = v; prefs.edit().putBoolean("flip", v).apply()
+        viewModelScope.launch { ble.sendCommands(listOf(CoolLedX.reverse(v))) }
+    }
     fun setMirror(v: Boolean) { _mirror.value = v; prefs.edit().putBoolean("mirror", v).apply() }
 
     private fun orient(g: PixelGrid): PixelGrid {
         var o = g
-        if (_mirror.value) o = o.mirrored()
-        if (_flip.value) o = o.rotated180()
+        if (_mirror.value) o = o.mirrored()   // upside-down is done by the sign itself (0x0C)
         return o
     }
 
     /** Scrolling direction as seen by the viewer must survive the flip/mirror. */
     private fun orientMode(m: CoolLedX.Mode): CoolLedX.Mode {
-        var mode = m
-        if (_mirror.value xor _flip.value) mode = when (mode) {
-            CoolLedX.Mode.LEFT -> CoolLedX.Mode.RIGHT; CoolLedX.Mode.RIGHT -> CoolLedX.Mode.LEFT; else -> mode
+        if (!_mirror.value) return m
+        return when (m) {
+            CoolLedX.Mode.LEFT -> CoolLedX.Mode.RIGHT; CoolLedX.Mode.RIGHT -> CoolLedX.Mode.LEFT; else -> m
         }
-        if (_flip.value) mode = when (mode) {
-            CoolLedX.Mode.UP -> CoolLedX.Mode.DOWN; CoolLedX.Mode.DOWN -> CoolLedX.Mode.UP; else -> mode
-        }
-        return mode
     }
 
     fun panel(): Pair<Int, Int> {
@@ -161,7 +159,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         val fitted = withContext(Dispatchers.Default) { frames.map { orient(it.fitTo(w, h)) } }
         if (fitted.size == 1) {
             val packets = withContext(Dispatchers.Default) { CoolLedX.sendImage(fitted[0]) }
-            ble.upload(CoolLedX.CMD_TEXT, packets, label,
+            ble.upload(CoolLedX.CMD_IMAGE, packets, label,
                 before = listOf(CoolLedX.mode(CoolLedX.Mode.STATIC)), after = listOf(CoolLedX.mode(CoolLedX.Mode.STATIC)))
         } else {
             val packets = withContext(Dispatchers.Default) {

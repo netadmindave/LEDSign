@@ -130,6 +130,8 @@ object CoolLedX {
     fun speed(v: Int) = frame(byteArrayOf(CMD_SPEED.toByte(), v.coerceIn(0, 255).toByte()))
     fun mode(m: Mode) = frame(byteArrayOf(CMD_MODE.toByte(), m.code.toByte()))
     fun power(on: Boolean) = frame(byteArrayOf(CMD_SWITCH.toByte(), if (on) 1 else 0))
+    /** Stock app "reverse": rotates the whole display 180 degrees on the sign itself. */
+    fun reverse(on: Boolean) = frame(byteArrayOf(0x0C, if (on) 1 else 0))
 
     // ------------------------------------------------------------ pixel encoding
     /**
@@ -199,11 +201,8 @@ object CoolLedX {
         return out.toByteArray()
     }
 
-    /**
-     * Still images go out as a TEXT upload (0x02) with the standard 107-byte header, which is what the
-     * hardware-tested RavestickBoard firmware does on the 16x64 CoolLEDX. Follow with mode STATIC.
-     */
-    fun sendImage(g: PixelGrid) = chunked(CMD_TEXT, textPayload(" ", g))
+    /** Still image: same as the stock app's getIconDataStrings (cmd 0x03, 24 zeros + len16 + planes). */
+    fun sendImage(g: PixelGrid) = chunked(CMD_IMAGE, imagePayload(g))
     fun sendText(text: String, g: PixelGrid) = chunked(CMD_TEXT, textPayload(text, g))
     fun sendAnimation(frames: List<PixelGrid>, speed: Int) = chunked(CMD_ANIMATION, animationPayload(frames, speed))
 

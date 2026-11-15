@@ -175,13 +175,13 @@ fun SignScreen(vm: AppVM) {
         Text("Orientation", fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(flip, { vm.setFlip(it) }); Spacer(Modifier.width(10.dp))
-            Column { Text("Upside-down (rotate 180°)"); Text("For a sign mounted inverted", style = MaterialTheme.typography.bodySmall) }
+            Column { Text("Reverse (upside-down)"); Text("Rotates the sign 180° — same as the stock app's Reverse", style = MaterialTheme.typography.bodySmall) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(mirror, { vm.setMirror(it) }); Spacer(Modifier.width(10.dp))
             Column { Text("Mirror (reverse left-right)"); Text("For reading through a window from behind", style = MaterialTheme.typography.bodySmall) }
         }
-        Text("Applies to everything you send from now on; scroll directions are adjusted to match.",
+        Text("Reverse is applied by the sign instantly. Mirror applies to what you send next.",
             style = MaterialTheme.typography.bodySmall)
         HorizontalDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
