@@ -3,7 +3,7 @@
 A clean, private replacement for the **CoolLED1248** app for CoolLEDX-family Bluetooth LED signs
 (tested target: 16×64 7-colour panel, board `16x64SRGB_BK_V1.3`).
 
-* **Library** – 39 built-in animations (Halloween, holidays, reading, optics), live previews, favourites,
+* **Library** – 100 built-in animations (Halloween, holidays, reading, optics — including meme-style ones), live previews, favourites,
   one-tap **Show**, adjustable frame time, "Edit a copy".
 * **Text** – type, pick a colour (or rainbow), choose still/scroll/snow/laser, live preview.
 * **Draw** – 64×16 pixel editor with frames, onion skin, shift tools, save to *My Creations*.

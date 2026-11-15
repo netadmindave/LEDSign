@@ -121,6 +121,9 @@ FONT = {
     '&': [".##..", "#..#.", "#.#..", ".#...", "#.#.#", "#..#.", ".##.#"],
     ':': [".....", "..#..", "..#..", ".....", "..#..", "..#..", "....."],
     '/': [".....", "....#", "...#.", "..#..", ".#...", "#....", "....."],
+    '%': ["##...", "##..#", "...#.", "..#..", ".#...", "#..##", "...##"],
+    '+': [".....", "..#..", "..#..", "#####", "..#..", "..#..", "....."],
+    '=': [".....", ".....", "#####", ".....", "#####", ".....", "....."],
     ' ': [".....", ".....", ".....", ".....", ".....", ".....", "....."],
 }
 # narrow glyphs drawn 3 wide to save space
@@ -153,6 +156,8 @@ def text(f, s, x, y, color, spacing=1):
 
 
 def text_c(f, s, y, color, x0=0, x1=W, spacing=1):
+    if text_width(s.upper(), spacing) > x1 - x0 and spacing > 0:
+        spacing = 0          # auto-tighten long lines so they never clip
     w = text_width(s.upper(), spacing)
     return text(f, s, x0 + (x1 - x0 - w) // 2, y, color, spacing)
 
@@ -169,6 +174,8 @@ MINI = {
 
 def mini(f, s, x, y, color):
     for i, ch in enumerate(s):
+        if ch not in MINI:
+            continue
         g = MINI[ch]
         for dy, row in enumerate(g):
             for dx, p in enumerate(row):

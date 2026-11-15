@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(__file__))
 from pixkit import H, W
-import set_halloween_reading, set_optics, set_holidays
+import set_halloween_reading, set_optics, set_holidays, set_memes
 from set_halloween_reading import ANIMS
 
 OUT = sys.argv[1]

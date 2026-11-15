@@ -25,6 +25,7 @@ import com.netadmindave.ledsign.protocol.PixelGrid
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,10 +101,12 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     val ble = SignBle(app)
     val builtIn: List<LedAnimation> by lazy { Library.builtIn(app) }
 
-    private val _creations = MutableStateFlow(Library.creations(app))
-    val creations = _creations.asStateFlow()
-    private val _favs = MutableStateFlow(Library.favorites(app))
-    val favs = _favs.asStateFlow()
+    private val _creations: MutableStateFlow<List<LedAnimation>> =
+        MutableStateFlow(com.netadmindave.ledsign.data.Library.creations(app))
+    val creations: StateFlow<List<LedAnimation>> = _creations.asStateFlow()
+    private val _favs: MutableStateFlow<Set<String>> =
+        MutableStateFlow(com.netadmindave.ledsign.data.Library.favorites(app))
+    val favs: StateFlow<Set<String>> = _favs.asStateFlow()
 
     /** Shared with the Draw tab when the user picks "Edit a copy". */
     val editRequest = MutableStateFlow<LedAnimation?>(null)
